@@ -1,0 +1,11 @@
+prefix=/home/gz222/software/gsl
+exec_prefix=/home/gz222/software/gsl
+libdir=/home/gz222/software/gsl/lib
+includedir=/home/gz222/software/gsl/include
+GSL_CBLAS_LIB=-lgslcblas
+
+Name: GSL
+Description: GNU Scientific Library
+Version: 2.6
+Libs: -L/home/gz222/software/gsl/lib -lgsl ${GSL_CBLAS_LIB} -lm -lm 
+Cflags: -I/home/gz222/software/gsl/include
