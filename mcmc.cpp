@@ -44,22 +44,22 @@ void init_state(Dat *dat, MCMC_state *state) {
 
     state->suffstats = (int *) calloc(state->n_cluster, sizeof(int));
     for (size_t i=0; i<state->n_cluster; i++) {
+	if (i > dat->n_snp) {
+	    break;
+	}
 	state->suffstats[state->assgn[i]]++;
     }
     state->sumsq = (double *) calloc(state->n_cluster, sizeof(double));
-    
+  
     state->cluster_var = (double *) malloc(sizeof(double)*state->n_cluster);
     for (size_t i=1; i<state->n_cluster; i++) {
 	std::gamma_distribution<> rgamma(state->suffstats[i]/2.0+state->a0k, \
 		1.0/state->b0k);
 	state->cluster_var[i] = 1.0/rgamma(gen);
     }
-    //state->cluster_var[1] = 3.9e-5/square(state->eta); 
-    //state->cluster_var[2] = 3.9e-5/square(state->eta); 
-    //state->cluster_var[3] = 7.8e-5/square(state->eta); 
 
     state->pi = (double *) malloc(sizeof(double)*state->n_cluster);
-    
+   
     int population[5] = {1, state->M_cluster[1]+1, \
  	    state->M_cluster[1]+state->M_cluster[2]+1, \
 	    state->M_cluster[1]+state->M_cluster[2]+state->M_cluster[3]+1, \
@@ -104,7 +104,7 @@ void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double
     gsl_rng *r = gsl_rng_alloc(gsl_rng_default);
     std::random_device rd;
     std::mt19937 gen(rd());
-    
+   
     init_state(dat, &state);
     state.rho = rho_0;
 
@@ -123,7 +123,7 @@ void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double
 	}
     }
     gsl_matrix *cov = gsl_matrix_alloc(dat->n_cov, dat->n_cov);
-    gsl_vector *alpha = gsl_vector_alloc(dat->n_cov);	    
+    gsl_vector *alpha = gsl_vector_alloc(dat->n_cov);
     double chisq = 0;
 
     for (size_t n_mcmc=0; n_mcmc<iter; n_mcmc++) {
@@ -661,7 +661,7 @@ void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double
     gsl_multifit_linear_free(work);
 }
 
-int main(int argc, char *argv[]) {
+/*int main(int argc, char *argv[]) {
     Dat dat;
 
     double rho = 0;
@@ -761,4 +761,4 @@ int main(int argc, char *argv[]) {
     free(dat.geno2_sq);
     free(dat.geno12_prod);
     return 0;
-}
+}*/
