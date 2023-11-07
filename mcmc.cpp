@@ -44,13 +44,13 @@ void init_state(Dat *dat, MCMC_state *state) {
 
     state->suffstats = (int *) calloc(state->n_cluster, sizeof(int));
     for (size_t i=0; i<state->n_cluster; i++) {
-	if (i > dat->n_snp) {
+	if (i >= dat->n_snp) {
 	    break;
 	}
 	state->suffstats[state->assgn[i]]++;
     }
     state->sumsq = (double *) calloc(state->n_cluster, sizeof(double));
-  
+ 
     state->cluster_var = (double *) malloc(sizeof(double)*state->n_cluster);
     for (size_t i=1; i<state->n_cluster; i++) {
 	std::gamma_distribution<> rgamma(state->suffstats[i]/2.0+state->a0k, \

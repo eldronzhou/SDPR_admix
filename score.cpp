@@ -6,9 +6,20 @@
 #include <string.h>
 #include <unordered_map>
 #include <regex>
+#include <zlib.h>
 
 using std::cout; using std::endl; using std::ifstream;
 using std::string; using std::getline; using std::unordered_map;
+
+
+void print_use() {
+    cout << "Usage: score -options" << endl << endl
+    << "-score (required) path to the weight file output by SDPR_admix. The format is." << endl << endl
+    << "-vcf (required) path to the phased genotype file." << endl << endl
+    << "-msp (required) path to the directory containing Rfmix2 solved local ancestry files." << endl << endl
+    << "-out (required) path to the output file." << endl << endl
+    << "-h print the options." << endl << endl;
+}
 
 void read_score(const std::string &score_path, unordered_map<string, Dat*> &dat_dict) {
     ifstream infile(score_path.c_str());
@@ -49,9 +60,17 @@ void get_size_vcf(const std::string &vcf_path, PRS_dat* prs_dat) {
     size_t n_snp = 0;
     size_t n_ind = 0;
     string line, token;
-    ifstream infile(vcf_path.c_str());
-        
-    while(getline(infile, line)) {
+    
+    gzFile infile2 = gzopen(vcf_path.c_str(), "rb");
+    char buffer[4096];
+
+    while (gzgets(infile2, buffer, 4096)) {
+        // Remove the newline character if it exists
+        size_t length = strlen(buffer);
+        if (length > 0 && buffer[length - 1] == '\n') {
+            buffer[length - 1] = '\0';
+        }
+	line = buffer;
 	if (line.find("##") == 0) {
 	    continue;
 	}
@@ -72,6 +91,7 @@ void get_size_vcf(const std::string &vcf_path, PRS_dat* prs_dat) {
     }
     prs_dat->n_snp = n_snp;
     prs_dat->n_ind = n_ind;
+    gzclose(infile2);
     cout << "In total " + std::to_string(n_snp) + " SNPs and " + \
 	std::to_string(n_ind) + " to be readed." << endl;
 }
@@ -84,7 +104,9 @@ void score(const std::string &vcf_path,  const std::string &msp_path, unordered_
     ifstream mspfile(msp_path.c_str());
     cout << "Reading RFmix msp file from: " + msp_path + "." << endl;
     
-    ifstream infile(vcf_path.c_str());
+    
+    gzFile infile2 = gzopen(vcf_path.c_str(), "rb");
+    char buffer[4096];
     cout << "Reading VCF file from: " + vcf_path + "." << endl;
 
     // skip first two lines of msp file
@@ -93,7 +115,13 @@ void score(const std::string &vcf_path,  const std::string &msp_path, unordered_
 
     // skip the header of vcf file
     int n_ind = prs_dat->n_ind;
-    while (getline(infile, line2)) {
+    while (gzgets(infile2, buffer, 4096)) {
+	// Remove the newline character if it exists
+        size_t length = strlen(buffer);
+        if (length > 0 && buffer[length - 1] == '\n') {
+            buffer[length - 1] = '\0';
+        }
+	line2 = buffer;
 	if (line2.find("##") == 0) {
 	    continue;
 	}
@@ -242,7 +270,14 @@ void score(const std::string &vcf_path,  const std::string &msp_path, unordered_
 	    // read the next line of vcf and update pos
 	    assert(idx2 == n_ind+9);
 	    
-	    if (getline(infile, line2)) {
+	    if (gzgets(infile2, buffer, 4096)) {
+		// Remove the newline character if it exists
+		size_t length = strlen(buffer);
+		if (length > 0 && buffer[length - 1] == '\n') {
+		    buffer[length - 1] = '\0';
+		}
+		line2 = buffer;
+		
 		iss2.clear();
 		iss2.str(line2);
 		for (idx2=0; idx2<9; idx2++) {
@@ -272,6 +307,11 @@ int main(int argc, char *argv[]) {
 
 	std::string score_path, vcf_path, msp_path, out_path;
 
+	if (argc == 1) {
+	    print_use();
+	    return 0;
+	}
+
 	int i = 1;
 		 
 	while (i < argc) {
@@ -291,6 +331,10 @@ int main(int argc, char *argv[]) {
 		out_path = argv[i+1];
 		i += 2;
 	    }
+	    else if (strcmp(argv[i], "-h") == 0) {
+		print_use();
+		return 0;
+	    }
 	    else {
 		cout << "Invalid option: " << argv[i] << endl;
 		return 0;
@@ -303,18 +347,28 @@ int main(int argc, char *argv[]) {
 	PRS_dat prs_dat;
 
 	string vcf_chr, msp_chr;
-	for (size_t i=1; i<23; i++) {
-	    vcf_chr = std::regex_replace(vcf_path, std::regex("#"), std::to_string(i));
-	    msp_chr = std::regex_replace(msp_path, std::regex("#"), std::to_string(i));
-	    cout << "Working on Chr" << std::to_string(i) << "." << endl;
-	    get_size_vcf(vcf_chr.c_str(), &prs_dat);
-	    if (i == 1) {
-		prs_dat.geno1 = (double *) calloc(prs_dat.n_ind, sizeof(double));
-		prs_dat.geno2 = (double *) calloc(prs_dat.n_ind, sizeof(double));
+	
+	if (vcf_path.find('#') < vcf_path.length()) {
+	    for (size_t i=1; i<23; i++) {
+		vcf_chr = std::regex_replace(vcf_path, std::regex("#"), std::to_string(i));
+		msp_chr = std::regex_replace(msp_path, std::regex("#"), std::to_string(i));
+		cout << "Working on Chr" << std::to_string(i) << "." << endl;
+		get_size_vcf(vcf_chr.c_str(), &prs_dat);
+		if (i == 1) {
+		    prs_dat.geno1 = (double *) calloc(prs_dat.n_ind, sizeof(double));
+		    prs_dat.geno2 = (double *) calloc(prs_dat.n_ind, sizeof(double));
+		}
+		score(vcf_chr.c_str(), msp_chr.c_str(), dat_dict, &prs_dat);
 	    }
-	    score(vcf_chr.c_str(), msp_chr.c_str(), dat_dict, &prs_dat);
 	}
-
+	else {
+	    cout << "Working on " << vcf_path << endl;
+	    get_size_vcf(vcf_path.c_str(), &prs_dat);
+	    prs_dat.geno1 = (double *) calloc(prs_dat.n_ind, sizeof(double));
+	    prs_dat.geno2 = (double *) calloc(prs_dat.n_ind, sizeof(double));
+	    score(vcf_path.c_str(), msp_path.c_str(), dat_dict, &prs_dat);
+	}
+	
 	unordered_map<string, Dat*>::iterator it;
 	for (it=dat_dict.begin(); it != dat_dict.end(); it++) {
 	    delete(it->second);
