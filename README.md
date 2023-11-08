@@ -28,7 +28,7 @@ Below are the required options.
 - vcf (required): Path to the phased genotype file in the gzipped vcf format.
 - msp (required): Path to path to the directory containing RFMix2 solved local ancestry files.
 - pheno (required): path to the phenotype file. The phenotype will be read from the 3rd column of the specified space- or tab-delimited file. There is no header and NA value can be included.
-- covar (required): path to the covariate file. The format is same as the phenotype file (no header, FID and IID in first two columns, covariates in remaining columns).
+- covar (required): path to the covariate file. Covariates will be reading from the first column. There is no header for the covariate file.
 - out (required): Path to the output file containing estimated effect sizes.
 - rho (required): Trans-ethnic genetic correlation output by PopCorn between 0 and 1. Default is 0.8. 
 
