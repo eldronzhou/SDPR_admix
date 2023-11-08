@@ -9,7 +9,12 @@ To install SDPR, you need to first download the repo:
 git clone https://github.com/eldronzhou/SDPR_admix.git
 ```
 
-You can then compile SDPR by running `make`. 
+You can then compile SDPR by running `make`. If there is run time error that the shared library "libgsl.so.0" not found, you can fix it by typing
+
+```
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:SDPR_admix_dir/gsl/lib
+```
+
 
 ## Quick start
 
