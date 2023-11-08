@@ -14,7 +14,7 @@ void print_use() {
     << "-pheno (required) path to the phenotype file. The phenotype will be read from the 3rd column of the specified space- or tab-delimited file. There is no header and NA value can be included." << endl << endl
     << "-vcf (required) path to the phased genotype file." << endl << endl
     << "-msp (required) path to the directory containing Rfmix2 solved local ancestry files." << endl << endl
-    << "-covar (optional) path to the covariate file. The format is same as the phenotype file (no header, FID and IID in first two columns, covariates in remaining columns)." << endl << endl
+    << "-covar (optional) path to the covariate file. Covariates will be reading from the first column. There is no header for the covariate file." << endl << endl
     << "-out (required) path to the output file." << endl << endl
     << "-rho (required) Cross-ancestry genetic correlation." << endl << endl	
     << "-h print the options." << endl << endl;
