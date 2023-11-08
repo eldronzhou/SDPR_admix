@@ -1,7 +1,7 @@
 
 CC = g++
 
-CFLAGS = -g3 -O3 -DHAVE_INLINE -march=native -Igsl/include -std=c++11 
+CFLAGS = -g3 -O3 -DHAVE_INLINE -lz -march=native -Igsl/include -std=c++11 
 
 all: SDPR_admix score
 
