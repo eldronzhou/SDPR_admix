@@ -17,6 +17,7 @@ void print_use() {
     << "-covar (optional) path to the covariate file. Covariates will be reading from the first column. There is no header for the covariate file." << endl << endl
     << "-out (required) path to the output file." << endl << endl
     << "-rho (required) Cross-ancestry genetic correlation." << endl << endl	
+    << "-thread (optional) Number of threads to use." << endl <<endl
     << "-h print the options." << endl << endl;
 }
 
@@ -33,7 +34,7 @@ int main(int argc, char *argv[]) {
     std::string pheno_path, geno1_path, \
         geno2_path, vcf_path, msp_path, out_path, covar_path;
 
-    int i = 1, iter = 1000, burn = 500;
+    int i = 1, iter = 1000, burn = 500, thread = 1;
     while (i < argc) {
         if (strcmp(argv[i], "-pheno") == 0) {
             pheno_path = argv[i+1];
@@ -61,6 +62,10 @@ int main(int argc, char *argv[]) {
         }
         else if (strcmp(argv[i], "-out") == 0) {
             out_path = argv[i+1];
+            i += 2;
+        }
+	else if (strcmp(argv[i], "-thread") == 0) {
+            thread = std::stoi(argv[i+1]);
             i += 2;
         }
         else if (strcmp(argv[i], "-covar") == 0) {
@@ -95,8 +100,8 @@ int main(int argc, char *argv[]) {
 
     prod_geno(&dat);
 
-    maf = 0.05;
-    mcmc(&dat, out_path.c_str(), iter, burn, maf, rho);
+    maf = 0.01;
+    mcmc(&dat, out_path.c_str(), iter, burn, maf, rho, thread);
 
     for (size_t i=0; i<dat.n_snp; i++) {
         free(dat.geno1[i]);

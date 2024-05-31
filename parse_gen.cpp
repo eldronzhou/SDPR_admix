@@ -3,8 +3,6 @@
 #include <sstream>
 #include <cstdio>
 #include <cstdlib>
-#include <zlib.h>
-#include <cstring>
 
 using std::cout; using std::endl; using std::ifstream;
 using std::string; using std::getline;
@@ -35,32 +33,7 @@ void get_size_vcf(const string &pheno_path, const string &geno_path, Dat *dat) {
     cout << "Warning: " + std::to_string(n_invalid) + \
 	" individuals with invalid phenotypes." << endl;
 
-    gzFile infile2 = gzopen(geno_path.c_str(), "rb");
-
-    char buffer[4096];
-
-    while (gzgets(infile2, buffer, 4096)) {
-	// Remove the newline character if it exists
-        size_t length = strlen(buffer);
-        if (length > 0 && buffer[length - 1] == '\n') {
-            buffer[length - 1] = '\0';
-        }
-	
-	line = buffer;
-	if (line.find("##") == 0) {
-	    continue;
-	}
-	else if (line.find("#") == 0) {
-	    continue;
-	}
-	else {
-	    n_snp++;
-	}
-    }
-
-    gzclose(infile2);
-
-    /*ifstream infile2(geno_path.c_str());
+    ifstream infile2(geno_path.c_str());
     while(getline(infile2, line)) {
 	if (line.find("##") == 0) {
 	    continue;
@@ -71,8 +44,7 @@ void get_size_vcf(const string &pheno_path, const string &geno_path, Dat *dat) {
 	else {
 	    n_snp++;	
 	}
-    }*/
-
+    }
     dat->n_snp = n_snp;
     cout << "In total " + std::to_string(n_snp) + " SNPs and " \
 	+ std::to_string(n_ind) + " individuals to be readed." << endl;
@@ -146,10 +118,8 @@ void read_lanc(const std::string &vcf_path,  const std::string &msp_path, Dat *d
     ifstream mspfile(msp_path.c_str());
     cout << "Reading RFmix msp file from: " + msp_path + "." << endl;
     
-    //ifstream infile(vcf_path.c_str());
-    //cout << "Reading VCF file from: " + vcf_path + "." << endl;
-    gzFile infile = gzopen(vcf_path.c_str(), "rb");
-    char buffer[4096];
+    ifstream infile(vcf_path.c_str());
+    cout << "Reading VCF file from: " + vcf_path + "." << endl;
 
     // skip first two lines of msp file
     getline(mspfile, line1);
@@ -157,14 +127,7 @@ void read_lanc(const std::string &vcf_path,  const std::string &msp_path, Dat *d
 
     // skip the header of vcf file
     int n_ind = 0;
-    while (gzgets(infile, buffer, 4096)) {
-	// Remove the newline character if it exists
-        size_t length = strlen(buffer);
-        if (length > 0 && buffer[length - 1] == '\n') {
-            buffer[length - 1] = '\0';
-        }
-	line2 = buffer;
-
+    while (getline(infile, line2)) {
 	if (line2.find("##") == 0) {
 	    continue;
 	}
@@ -319,14 +282,7 @@ void read_lanc(const std::string &vcf_path,  const std::string &msp_path, Dat *d
 	    // read the next line of vcf and update pos
 	    assert(idx2 == n_ind+9);
 	    
-	    if (gzgets(infile, buffer, 4096)) {
-		// Remove the newline character if it exists
-		size_t length = strlen(buffer);
-		if (length > 0 && buffer[length - 1] == '\n') {
-		    buffer[length - 1] = '\0';
-		}
-
-		line2 = buffer;
+	    if (getline(infile, line2)) {
 		iss2.clear();
 		iss2.str(line2);
 		for (idx2=0; idx2<9; idx2++) {
@@ -349,7 +305,6 @@ void read_lanc(const std::string &vcf_path,  const std::string &msp_path, Dat *d
     cout << "Readed " << std::to_string(idx_snp+1) << \
 	" SNPs from " << std::to_string(dat->n_ind) << " individuals." << endl;
     free(hap_lanc);
-    gzclose(infile);
 
     // write to the output
     /*std::ofstream out1("./X_afr.txt");

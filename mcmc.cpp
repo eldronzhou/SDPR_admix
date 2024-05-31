@@ -1,6 +1,7 @@
 #include "mcmc.h"
 #include <cmath>
 #include <random>
+#include <omp.h>
 #include "gsl/gsl_randist.h"
 #include "gsl/gsl_statistics_double.h"
 #include "gsl/gsl_blas.h"
@@ -15,7 +16,7 @@ using std::cout; using std::endl;
 
 void init_state(Dat *dat, MCMC_state *state) {
     state->n_cluster = state->M_cluster[0] + state->M_cluster[1] + \
-		       state->M_cluster[2] + state->M_cluster[3] + state->M_cluster[4];
+		       state->M_cluster[2] + state->M_cluster[3];
     state->beta1 = (double *) calloc(dat->n_snp, sizeof(double));
     state->beta2 = (double *) calloc(dat->n_snp, sizeof(double));
     state->residual = (double *) malloc(sizeof(double)*dat->n_ind);
@@ -44,28 +45,27 @@ void init_state(Dat *dat, MCMC_state *state) {
 
     state->suffstats = (int *) calloc(state->n_cluster, sizeof(int));
     for (size_t i=0; i<state->n_cluster; i++) {
-	if (i >= dat->n_snp) {
-	    break;
-	}
 	state->suffstats[state->assgn[i]]++;
     }
     state->sumsq = (double *) calloc(state->n_cluster, sizeof(double));
- 
+    
     state->cluster_var = (double *) malloc(sizeof(double)*state->n_cluster);
     for (size_t i=1; i<state->n_cluster; i++) {
 	std::gamma_distribution<> rgamma(state->suffstats[i]/2.0+state->a0k, \
 		1.0/state->b0k);
 	state->cluster_var[i] = 1.0/rgamma(gen);
     }
+    //state->cluster_var[1] = 3.9e-5/square(state->eta); 
+    //state->cluster_var[2] = 3.9e-5/square(state->eta); 
+    //state->cluster_var[3] = 7.8e-5/square(state->eta); 
 
     state->pi = (double *) malloc(sizeof(double)*state->n_cluster);
-   
-    int population[5] = {1, state->M_cluster[1]+1, \
- 	    state->M_cluster[1]+state->M_cluster[2]+1, \
-	    state->M_cluster[1]+state->M_cluster[2]+state->M_cluster[3]+1, \
-            state->M_cluster[1]+state->M_cluster[2]+state->M_cluster[3]+state->M_cluster[4]+1}; 
     
-    for (size_t j=1; j<5; j++) {
+    int population[4] = {1, state->M_cluster[1]+1, \
+ 	    state->M_cluster[1]+state->M_cluster[2]+1, \
+	    state->M_cluster[1]+state->M_cluster[2]+state->M_cluster[3]+1}; 
+    
+    for (size_t j=1; j<4; j++) {
 	for (int i=population[j-1]; i<population[j]; i++) {
 	    state->pi[i] = 1.0/state->M_cluster[j];
 	}
@@ -99,14 +99,15 @@ void destroy_state(MCMC_state *state) {
     free(state->cj);
 }
 
-void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double rho_0) {
+void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double rho, int thread) {
     MCMC_state state;
     gsl_rng *r = gsl_rng_alloc(gsl_rng_default);
     std::random_device rd;
     std::mt19937 gen(rd());
-   
+    
     init_state(dat, &state);
-    state.rho = rho_0;
+    state.rho = rho;
+    omp_set_num_threads(thread);
 
     double *res_beta1 = (double *) calloc(dat->n_snp, sizeof(double));
     double *res_beta2 = (double *) calloc(dat->n_snp, sizeof(double));
@@ -123,7 +124,7 @@ void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double
 	}
     }
     gsl_matrix *cov = gsl_matrix_alloc(dat->n_cov, dat->n_cov);
-    gsl_vector *alpha = gsl_vector_alloc(dat->n_cov);
+    gsl_vector *alpha = gsl_vector_alloc(dat->n_cov);	    
     double chisq = 0;
 
     for (size_t n_mcmc=0; n_mcmc<iter; n_mcmc++) {
@@ -172,6 +173,7 @@ void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double
 	    state.log_p[0] = log(state.pi_pop[0] + 1e-40);
 	    
 	    // ancestry 1 specific terms
+	    #pragma omp parallel for simd
 	    for (int k=1; k<state.M_cluster[1]+1; k++) {
 		state.log_p[k] = -.5 * log(square(state.eta) * dat->geno1_sq[i] * state.cluster_var[k] / state.sigmae2 + 1) \
 		                  + .5 * square(bj1) / (square(state.eta) * dat->geno1_sq[i] / \
@@ -180,6 +182,7 @@ void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double
 	    }
 	    
 	    // ancestry 2 specific terms
+	    #pragma omp parallel for simd
 	    for (int k=state.M_cluster[1]+1; k<state.M_cluster[1]+state.M_cluster[2]+1; k++) {
 		state.log_p[k] = -.5 * log(square(state.eta) * dat->geno2_sq[i] * state.cluster_var[k] / state.sigmae2 + 1) \
 				 + .5 * square(bj2) / (square(state.eta) * dat->geno2_sq[i] / \
@@ -188,28 +191,17 @@ void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double
 	    }
 	     
 	    // ancestry 1 & 2 shared terms
-	    for (int k=state.M_cluster[1]+state.M_cluster[2]+1; k<state.n_cluster; k++) {
+	    #pragma omp parallel for simd
+	    for (int k=state.M_cluster[1]+state.M_cluster[2]+1; k<1+state.M_cluster[1]+state.M_cluster[2]+state.M_cluster[3]; k++) {
 		
-		double rho = 0, pi_pop = 0;
-		if (k < state.M_cluster[1]+state.M_cluster[2]+state.M_cluster[3]+1) {
-		    // correlated effect sizes
-		    rho = state.rho;
-		    pi_pop = state.pi_pop[3];
-		}
-		else {
-		    // same effect sizes 
-		    rho = 0.9999;
-		    pi_pop = state.pi_pop[4];
-		}
-
 		state.aj1[k] = dat->geno1_sq[i] / (2*state.sigmae2) * square(state.eta) \
-			       + .5/( (1 - square(rho)) * state.cluster_var[k]);
-
+			       + .5/( (1 - square(state.rho)) * state.cluster_var[k]);
+		
 		state.aj2[k] = dat->geno2_sq[i] / (2*state.sigmae2) * square(state.eta) \
-			       + .5/( (1 - square(rho)) * state.cluster_var[k]);
+			       + .5/( (1 - square(state.rho)) * state.cluster_var[k]);
 
 		state.cj[k] = - dat->geno12_prod[i] / state.sigmae2 * square(state.eta) \
-			       + rho / ( (1 - square(rho)) * state.cluster_var[k]);
+			       + state.rho / ( (1 - square(state.rho)) * state.cluster_var[k]);
 
 		state.mu_j1[k] = ( 2 * state.aj2[k] * bj1 + state.cj[k] * bj2 ) / \
 				 ( 4 * state.aj1[k] * state.aj2[k] - square(state.cj[k]) );
@@ -219,13 +211,14 @@ void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double
 		
 		state.log_p[k] = -.5 * log( 4 * state.aj1[k] * state.aj2[k] - square(state.cj[k]) ) - \
 				 log( state.cluster_var[k] ) - \
-				 .5 * log( 1 - square(rho) ) + \
+				 .5 * log( 1 - square(state.rho) ) + \
 				 state.aj1[k] * square(state.mu_j1[k]) + \
 				 state.aj2[k] * square(state.mu_j2[k]) - \
 				 state.cj[k] * state.mu_j1[k] * state.mu_j2[k] + \
-				 log(pi_pop * state.pi[k] + 1e-40);
+				 log(state.pi_pop[3] * state.pi[k] + 1e-40);
 	    }
 
+	    // log exp sum
 	    double max = state.log_p[0], log_exp_sum = 0;
 	    for (size_t k=1; k<state.n_cluster; k++) {
 		// only keep ancestry 2 for ancestry 2 specific variants
@@ -287,7 +280,7 @@ void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double
 		    }
 		}
 		else if (dat->maf2[i] < maf) {
-		    // only keep ancestry 1 for ancestry 1 specific variants
+		    // only keep ancestry 1 for ancestry 2 specific variants
 		    state.assgn[i] = 0;
 		    break;
 		    if (k>=state.M_cluster[1]+1 && k<state.M_cluster[1]+state.M_cluster[2]+1) {
@@ -396,16 +389,8 @@ void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double
 		state.sumsq[state.assgn[i]] += square(state.beta2[i]) / 2.0;
 	    }
 	    else {
-		double rho = 0;
-		           
-		if (state.assgn[i] < state.M_cluster[1]+state.M_cluster[2]+state.M_cluster[3]+1) {
-		    rho = state.rho;
-		}
-		else {
-		    rho = 0.9999;
-		}
 		state.sumsq[state.assgn[i]] += ( square(state.beta1[i]) + square(state.beta2[i]) - \
-			2 * rho * state.beta1[i] * state.beta2[i] ) / (2 * (1 - square(rho)) );
+			2 * state.rho * state.beta1[i] * state.beta2[i] ) / (2 * (1 - square(state.rho)) );
 	    }
 	}
 
@@ -417,16 +402,15 @@ void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double
 	}
 	
 	// sample V
-	int population[5] = {1, state.M_cluster[1]+1, \
+	int population[4] = {1, state.M_cluster[1]+1, \
 	                     state.M_cluster[1]+state.M_cluster[2]+1, \
-	                     state.M_cluster[1]+state.M_cluster[2]+state.M_cluster[3]+1, \
-			     state.M_cluster[1]+state.M_cluster[2]+state.M_cluster[3]+state.M_cluster[4]+1}; 
+	                     state.M_cluster[1]+state.M_cluster[2]+state.M_cluster[3]+1}; 
 	
 	double *a = (double *) calloc(state.n_cluster, sizeof(double));
 
 	a[(size_t)state.n_cluster-2] = state.suffstats[(size_t)state.n_cluster-1];
 	for (int k=state.n_cluster-3; k>0; k--) {
-	    if (k == state.M_cluster[1] || k == state.M_cluster[1]+state.M_cluster[2] || k == state.M_cluster[1]+state.M_cluster[2]+state.M_cluster[3]) {
+	    if (k == state.M_cluster[1] || k == state.M_cluster[1]+state.M_cluster[2]) {
 		a[k] = 0;
 	    }
 	    else { 
@@ -434,7 +418,7 @@ void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double
 	    }
 	}
 
-	for (size_t j=1; j<5; j++) {
+	for (size_t j=1; j<4; j++) {
 	    for (int k=population[j-1]; k<population[j]; k++) {
 		state.V[k] = gsl_ran_beta(r, 1 + state.suffstats[k], \
 			    state.alpha[j-1] + a[k]);
@@ -443,7 +427,6 @@ void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double
 	state.V[state.M_cluster[1]] = 1;
 	state.V[state.M_cluster[1]+state.M_cluster[2]] = 1;
 	state.V[state.M_cluster[1]+state.M_cluster[2]+state.M_cluster[3]] = 1;
-	state.V[state.M_cluster[1]+state.M_cluster[2]+state.M_cluster[3]+state.M_cluster[4]] = 1;
 
 
 	// update p
@@ -483,24 +466,7 @@ void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double
 
 	a[state.M_cluster[1]+state.M_cluster[2]+1] = 1 - state.V[state.M_cluster[1]+state.M_cluster[2]+1];
 	state.pi[state.M_cluster[1]+state.M_cluster[2]+1] = state.V[state.M_cluster[1]+state.M_cluster[2]+1];
-	for (int k=state.M_cluster[1]+state.M_cluster[2]+2; k<state.M_cluster[1]+state.M_cluster[2]+state.M_cluster[3]+1; k++) {
-	    a[k] = a[k-1] * (1 - state.V[k]);
-	    state.pi[k] = a[k-1] * state.V[k];
-	    if (state.V[k] == 1) {
-		for (int m=k+1; m<state.n_cluster; m++) {
-		    a[m] = 0;
-		    state.pi[m] = 0;
-		}
-		break;
-	    }
-	}
-	if (state.pi[state.M_cluster[1]+state.M_cluster[2]+state.M_cluster[3]] < 0) {
-	    state.pi[state.M_cluster[1]+state.M_cluster[2]+state.M_cluster[3]] = 0;
-	}
-
-	a[state.M_cluster[1]+state.M_cluster[2]+state.M_cluster[3]+1] = 1 - state.V[state.M_cluster[1]+state.M_cluster[2]+state.M_cluster[3]+1];
-	state.pi[state.M_cluster[1]+state.M_cluster[2]+state.M_cluster[3]+1] = state.V[state.M_cluster[1]+state.M_cluster[2]+state.M_cluster[3]+1];
-	for (int k=state.M_cluster[1]+state.M_cluster[2]+state.M_cluster[3]+2; k<state.n_cluster; k++) {
+	for (int k=state.M_cluster[1]+state.M_cluster[2]+2; k<state.n_cluster; k++) {
 	    a[k] = a[k-1] * (1 - state.V[k]);
 	    state.pi[k] = a[k-1] * state.V[k];
 	    if (state.V[k] == 1) {
@@ -521,9 +487,9 @@ void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double
 	int null_anc1 = 0, null_anc2 = 0;        
 	int nonull_anc1 = 0, nonull_anc2 = 0;
 	
-	double alpha[5] = {1, 1, 1, 1, 1};
+	double alpha[4] = {1, 1, 1, 1};
 	alpha[0] += state.suffstats[0];
-	for (size_t j=1; j<5; j++) {
+	for (size_t j=1; j<4; j++) {
 	    for (int k=population[j-1]; k<population[j]; k++) {
 		alpha[j] += state.suffstats[k];
 	    }
@@ -531,7 +497,7 @@ void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double
 	alpha[0] = alpha[0] - null_anc1 - null_anc2 ;
 	alpha[1] -= nonull_anc1;
 	alpha[2] -= nonull_anc2;
-	gsl_ran_dirichlet(r, 5, alpha, state.pi_pop);
+	gsl_ran_dirichlet(r, 4, alpha, state.pi_pop);
 	//state.pi_pop[1] = 0; state.pi_pop[2] = 0;
 
 	// sample alpha
@@ -554,22 +520,13 @@ void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double
 	state.alpha[1] = gsl_ran_gamma(r, .1+m-1, 1.0/(.1-sum));
 
 	sum = 0, m = 0;
-	for (int k=state.M_cluster[1]+state.M_cluster[2]+1; k<state.M_cluster[1]+state.M_cluster[2]+state.M_cluster[3]+1; k++) {
+	for (int k=state.M_cluster[1]+state.M_cluster[2]+1; k<state.n_cluster; k++) {
 	    if (state.V[k] != 0) {
 		sum += log(1 - state.V[k]);
 		m++;
 	    }
 	}
 	state.alpha[2] = gsl_ran_gamma(r, .1+m-1, 1.0/(.1-sum)); 
-
-	sum = 0, m = 0;
-	for (int k=state.M_cluster[1]+state.M_cluster[2]+state.M_cluster[3]+1; k<state.n_cluster; k++) {
-	    if (state.V[k] != 0) {
-		sum += log(1 - state.V[k]);
-		m++;
-	    }
-	}
-	state.alpha[3] = gsl_ran_gamma(r, .1+m-1, 1.0/(.1-sum));
 
 	// sample eta and compute h2
 	double G2 = 0, YG_prod = 0;
@@ -635,7 +592,7 @@ void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double
 	cout << std::to_string(h2) << " " << std::to_string(state.pi_pop[0]) \
 	    << " " << std::to_string(state.pi_pop[1]) << " " << \
 	    std::to_string(state.pi_pop[2]) << " " << std::to_string(state.pi_pop[3]) \
-	    << " " << std::to_string(state.pi_pop[4]) << " max beta1: " << std::to_string(max_beta1) \
+	    << " max beta1: " << std::to_string(max_beta1) \
 	    <<" max beta2: " << std::to_string(max_beta2) << endl; \
 	}
     }   
@@ -664,8 +621,6 @@ void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double
 /*int main(int argc, char *argv[]) {
     Dat dat;
 
-    double rho = 0;
-
     std::string pheno_path, geno1_path, \
 	geno2_path, vcf_path, msp_path, out_path, covar_path;
 
@@ -691,10 +646,6 @@ void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double
 	    msp_path = argv[i+1];
 	    i += 2;
 	}
-	else if (strcmp(argv[i], "-rho") == 0) {
-	    rho = std::stoi(argv[i+1]);
-	    i += 2;
-	}
 	else if (strcmp(argv[i], "-iter") == 0) {
 	    iter = std::stoi(argv[i+1]);
 	    i +=2;
@@ -703,10 +654,6 @@ void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double
 	    burn = std::stoi(argv[i+1]);
 	    i += 2;
 	}
-	else if (strcmp(argv[i], "-rho") == 0) {
-            rho = std::stod(argv[i+1]);
-            i += 2;
-        }
 	else if (strcmp(argv[i], "-out") == 0) {
 	    out_path = argv[i+1];
 	    i += 2;
@@ -739,8 +686,8 @@ void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double
     
     prod_geno(&dat);
 
-    maf = 0.05;
-    mcmc(&dat, out_path.c_str(), iter, burn, maf, rho);
+    maf = 0.01;
+    mcmc(&dat, out_path.c_str(), iter, burn, maf);
 
     for (size_t i=0; i<dat.n_snp; i++) {
 	free(dat.geno1[i]);

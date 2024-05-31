@@ -3,11 +3,11 @@
 
 typedef struct {
     double eta = 1.0;
-    double rho = 0;
+    double rho = 0.93;
     //double sigmae2 = 0.14;
     double sigmae2 = 1.0;
     double a0k = 0.5, b0k = 0.5;
-    int M_cluster[5] = {1, 500, 500, 500, 500};
+    int M_cluster[4] = {1, 500, 500, 1000};
     double n_cluster;
     double *beta1;
     double *beta2;
@@ -21,8 +21,8 @@ typedef struct {
     int *suffstats;
     double *sumsq;
     //double pi_pop[4] = {0.8, 0.05, 0.05, 0.1};
-    double pi_pop[5] = {0.2, 0.2, 0.2, 0.2, 0.2};
-    double alpha[4] = {1.0, 1.0, 1.0, 1.0};
+    double pi_pop[4] = {0.25, 0.25, 0.25, 0.25};
+    double alpha[3] = {1.0, 1.0, 1.0};
     double *aj1;
     double *aj2;
     double *cj;
@@ -38,4 +38,4 @@ typedef struct {
     double h2;
 } MCMC_samples;
 
-void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double rho_0);
+void mcmc(Dat *dat, std::string out_path, int iter, int burn, double maf, double rho, int thread);

@@ -1,7 +1,7 @@
 
 CC = g++
 
-CFLAGS = -g3 -O3 -DHAVE_INLINE -lz -march=native -Igsl/include -std=c++11 
+CFLAGS = -g3 -O3 -ftree-vectorize -DHAVE_INLINE -lz -lgomp -march=native -Igsl/include -std=c++11 
 
 all: SDPR_admix score
 
@@ -17,8 +17,8 @@ regress.o: parse_gen.cpp parse_gen.h regress.cpp regress.h
 parse_gen.o: parse_gen.cpp parse_gen.h
 	${CC} ${CFLAGS} -c parse_gen.cpp
 
-mcmc.o: parse_gen.cpp parse_gen.h mcmc.cpp mcmc.h regress.cpp regress.h
-	${CC} ${CFLAGS} -c mcmc.cpp
+mcmc.o: parse_gen.cpp parse_gen.h mcmc.cpp mcmc.h regress.cpp regress.h sse_mathfun.h
+	${CC} ${CFLAGS} -fopenmp -c mcmc.cpp
 
 score: score.o
 	${CC} ${CFLAGS} score.o -o score
