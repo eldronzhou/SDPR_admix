@@ -45,6 +45,9 @@ void init_state(Dat *dat, MCMC_state *state) {
 
     state->suffstats = (int *) calloc(state->n_cluster, sizeof(int));
     for (size_t i=0; i<state->n_cluster; i++) {
+	if (i >= dat->n_snp) {
+	    break;
+	}
 	state->suffstats[state->assgn[i]]++;
     }
     state->sumsq = (double *) calloc(state->n_cluster, sizeof(double));
