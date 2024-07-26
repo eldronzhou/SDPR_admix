@@ -9,6 +9,7 @@
 using std::cout; using std::endl; using std::ifstream;
 using std::string; using std::getline;
 
+
 // get n_snp and n_ind
 void get_size_vcf(const string &pheno_path, const string &geno_path, Dat *dat) {
     size_t n_ind = 0;
@@ -42,20 +43,21 @@ void get_size_vcf(const string &pheno_path, const string &geno_path, Dat *dat) {
     while (gzgets(infile2, buffer, 4096)) {
 	// Remove the newline character if it exists
         size_t length = strlen(buffer);
-        if (length > 0 && buffer[length - 1] == '\n') {
-            buffer[length - 1] = '\0';
+	line.append(buffer);
+        if (length > 0 && buffer[length - 1] != '\n') {
+	    continue;
         }
-	
-	line = buffer;
+
 	if (line.find("##") == 0) {
-	    continue;
-	}
-	else if (line.find("#") == 0) {
-	    continue;
-	}
-	else {
+	    line.clear();
+        }
+        else if (line.find("#") == 0) {
+	    line.clear();
+        }
+        else {
+            line.clear();
 	    n_snp++;
-	}
+        }
     }
 
     gzclose(infile2);
@@ -158,14 +160,14 @@ void read_lanc(const std::string &vcf_path,  const std::string &msp_path, Dat *d
     // skip the header of vcf file
     int n_ind = 0;
     while (gzgets(infile, buffer, 4096)) {
-	// Remove the newline character if it exists
-        size_t length = strlen(buffer);
-        if (length > 0 && buffer[length - 1] == '\n') {
-            buffer[length - 1] = '\0';
+        line2.append(buffer);
+	size_t length = strlen(buffer);
+        if (length > 0 && buffer[length - 1] != '\n') {
+	    continue;
         }
-	line2 = buffer;
 
 	if (line2.find("##") == 0) {
+	    line2.clear();
 	    continue;
 	}
 	else if (line2.find("#") == 0) {
@@ -175,6 +177,7 @@ void read_lanc(const std::string &vcf_path,  const std::string &msp_path, Dat *d
 		idx_2++;
 	    }
 	    n_ind = idx_2 - 9;
+	    line2.clear();
 	}
 	else {
 	    break;
@@ -191,7 +194,12 @@ void read_lanc(const std::string &vcf_path,  const std::string &msp_path, Dat *d
     for (; idx2<9; idx2++) {
 	getline(iss2, token2, '\t');
 	if (idx2 == 0) {
-	    chr_vcf = std::stoi(token2);
+	   if (token2.find("chr") == 0) {
+               chr_vcf = std::stoi(token2.substr(3));
+	   }
+	   else { 
+	       chr_vcf = std::stoi(token2);
+	   }
 	}
 	if (idx2 == 1) {
 	    pos = std::stoul(token2);
@@ -219,7 +227,12 @@ void read_lanc(const std::string &vcf_path,  const std::string &msp_path, Dat *d
 	for (int idx1=0; idx1<2*n_ind+6; idx1++) {
 	    getline(iss1, token1, '\t'); 
 	    if (idx1 == 0) {
-		chr_msp = std::stoi(token1);
+	        if (token1.find("chr") == 0) {
+	            chr_msp = std::stoi(token1.substr(3));
+		}
+		else {
+		   chr_msp = std::stoi(token1);
+		}
 	    }
 	    else if (idx1 == 1) {
 		spos = std::stoul(token1);
@@ -318,21 +331,29 @@ void read_lanc(const std::string &vcf_path,  const std::string &msp_path, Dat *d
 	    
 	    // read the next line of vcf and update pos
 	    assert(idx2 == n_ind+9);
-	    
+	   
+	    line2.clear();
+
 	    if (gzgets(infile, buffer, 4096)) {
-		// Remove the newline character if it exists
 		size_t length = strlen(buffer);
-		if (length > 0 && buffer[length - 1] == '\n') {
-		    buffer[length - 1] = '\0';
+		line2.append(buffer);
+		while (length > 0 && buffer[length - 1] != '\n') {
+		    gzgets(infile, buffer, 4096);
+		    length = strlen(buffer);
+		    line2.append(buffer);
 		}
 
-		line2 = buffer;
 		iss2.clear();
 		iss2.str(line2);
 		for (idx2=0; idx2<9; idx2++) {
 		    getline(iss2, token2, '\t');
 		    if (idx2 == 0) {
-			chr_vcf = std::stoi(token2);
+			if (token2.find("chr") == 0) {
+			   chr_vcf = std::stoi(token2.substr(3));
+			}
+			else {
+		            chr_vcf = std::stoi(token2);
+			}
 		    }
 		    if (idx2 == 1) {
 			pos = std::stoul(token2);
