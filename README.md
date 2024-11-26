@@ -30,7 +30,7 @@ Below are the required options.
 - pheno (required): path to the phenotype file. The phenotype will be read from the 3rd column of the specified space- or tab-delimited file. There is no header and NA value can be included.
 - covar (required): path to the covariate file. Covariates will be reading from the first column. There is no header for the covariate file.
 - out (required): Path to the output file containing estimated effect sizes.
-- rho (required): Trans-ethnic genetic correlation output by PopCorn between 0 and 1. Default is 0.8. 
+- rho (required): Trans-ethnic genetic correlation output by Admix-kit between 0 and 1. Default is 0.8. 
 
 ## Running SDPR_admix
 
