@@ -1,5 +1,5 @@
 # SDPR_admix
-A statistical method to calculate PRS in admixed population. SDPR_admix is still in the early stage of testing. If you have encounbtered a problem, please contact geyu.zhou@yale.edu.
+A statistical method to calculate PRS in admixed population. SDPR_admix is still in the early stage of testing. If you have encounbtered a problem, please contact zhou1633@purdue.edu.
 
 ## Installation
 
