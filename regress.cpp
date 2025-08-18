@@ -54,7 +54,7 @@ void linear(Dat *dat, std::string out_path, int thread) {
     gsl_multifit_linear_free(work);
 }
 
-int main(int argc, char *argv[]) {
+/*int main(int argc, char *argv[]) {
     Dat dat;
 
     std::string pheno_path, vcf_path, msp_path, out_path, covar_path;
@@ -103,5 +103,5 @@ int main(int argc, char *argv[]) {
         read_cov(covar_path.c_str(), &dat);
     }
     linear(&dat, out_path.c_str(), thread);
-}
+}*/
 
