@@ -51,10 +51,10 @@ where the columns are chromsome, position, variant ID, effect allele, non-effect
 The following command can be used to calculate ancestry-aware PRS for the admixed population.
 
 ```bash
-./score -vcf test/chr22_train.vcf.gz -msp test/chr22_train.msp.tsv -score test/res.txt -out test/test.profile
+./score -vcf test/chr22_test.vcf.gz -msp test/chr22_test.msp.tsv -score test/res.txt -out test/test.profile
 ```
-If you have bgzipped vcf and RFMix2 local ancestry files for chr1-22 with the name `test/chr[1-22]_train.vcf.gz`, then you can use the following command for iterative calculation over all chromsomes:
+If you have bgzipped vcf and RFMix2 local ancestry files for chr1-22 with the name `test/chr[1-22]_test.vcf.gz`, then you can use the following command for iterative calculation over all chromsomes:
 
 ```bash
-./score -vcf test/chr#_train.vcf.gz -msp test/chr#_train.msp.tsv -score test/res.txt -out test/test.profile
+./score -vcf test/chr#_test.vcf.gz -msp test/chr#_test.msp.tsv -score test/res.txt -out test/test.profile
 ```
